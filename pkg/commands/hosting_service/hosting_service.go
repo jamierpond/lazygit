@@ -73,6 +73,42 @@ func (self *HostingServiceMgr) GetRepoName() (string, error) {
 	return repoName, nil
 }
 
+// ServiceInfo holds the resolved hosting service for a remote URL. Owner
+// comes from the "owner" named regex capture, which only exists for
+// owner/repo-shaped providers (github, gitlab, bitbucket, gitea, codeberg);
+// it's empty for azuredevops and bitbucketServer, whose URLs are organised
+// differently. Repository is populated for every provider, but RepoName may
+// have more than two segments (e.g. "org/project/repo" for azuredevops).
+type ServiceInfo struct {
+	Provider   string // e.g. "github"
+	WebDomain  string // e.g. "github.com", or "git.acme.com" for an on-prem instance
+	Owner      string // e.g. "jesseduffield"
+	Repository string // e.g. "lazygit"
+	RepoName   string // e.g. "jesseduffield/lazygit"
+}
+
+// GetServiceInfo identifies which hosting service the configured remote URL
+// belongs to and returns enough information to talk to its web/API host.
+func (self *HostingServiceMgr) GetServiceInfo() (ServiceInfo, error) {
+	serviceDomain, err := self.getServiceDomain(self.remoteURL)
+	if err != nil {
+		return ServiceInfo{}, err
+	}
+
+	matches, err := serviceDomain.serviceDefinition.parseRemoteUrl(self.remoteURL)
+	if err != nil {
+		return ServiceInfo{}, err
+	}
+
+	return ServiceInfo{
+		Provider:   serviceDomain.serviceDefinition.provider,
+		WebDomain:  serviceDomain.webDomain,
+		Owner:      matches["owner"],
+		Repository: matches["repo"],
+		RepoName:   utils.ResolvePlaceholderString(serviceDomain.serviceDefinition.repoNameTemplate, matches),
+	}, nil
+}
+
 func (self *HostingServiceMgr) getService() (*Service, error) {
 	serviceDomain, err := self.getServiceDomain(self.remoteURL)
 	if err != nil {

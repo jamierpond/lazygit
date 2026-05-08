@@ -195,7 +195,7 @@ type ServiceDefinition struct {
 	pullRequestURLIntoDefaultBranch string
 	pullRequestURLIntoTargetBranch  string
 	commitURL                       string
-	regexStrings                    []string
+	urlRegexps                      []*regexp.Regexp
 
 	// can expect 'webdomain' to be passed in. Otherwise, you get to pick what we match in the regex
 	repoURLTemplate  string
@@ -222,8 +222,7 @@ func (self ServiceDefinition) getRepoNameFromRemoteURL(url string) (string, erro
 }
 
 func (self ServiceDefinition) parseRemoteUrl(url string) (map[string]string, error) {
-	for _, regexStr := range self.regexStrings {
-		re := regexp.MustCompile(regexStr)
+	for _, re := range self.urlRegexps {
 		matches := utils.FindNamedMatches(re, url)
 		if matches != nil {
 			return matches, nil
@@ -242,8 +241,7 @@ type RepoInformation struct {
 // GetRepoInfoFromURL parses a remote URL (SSH or HTTPS) and extracts the
 // owner and repository name using the default URL regex patterns.
 func GetRepoInfoFromURL(url string) (RepoInformation, error) {
-	for _, regexStr := range defaultUrlRegexStrings {
-		re := regexp.MustCompile(regexStr)
+	for _, re := range defaultUrlRegexps {
 		matches := utils.FindNamedMatches(re, url)
 		if matches != nil {
 			return RepoInformation{

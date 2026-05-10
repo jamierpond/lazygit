@@ -9,6 +9,7 @@ import (
 	"github.com/jesseduffield/generics/set"
 	"github.com/jesseduffield/lazygit/pkg/commands/git_commands"
 	"github.com/jesseduffield/lazygit/pkg/commands/models"
+	"github.com/jesseduffield/lazygit/pkg/commands/patch"
 	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/context"
 	"github.com/jesseduffield/lazygit/pkg/gui/filetree"
@@ -1042,10 +1043,44 @@ func (self *FilesController) setStatusFiltering(filter filetree.FileTreeDisplayF
 }
 
 func (self *FilesController) edit(nodes []*filetree.FileNode) error {
-	return self.c.Helpers().Files.EditFiles(lo.FilterMap(nodes,
-		func(node *filetree.FileNode, _ int) (string, bool) {
-			return node.GetPath(), node.IsFile()
-		}))
+	paths := lo.FilterMap(nodes, func(node *filetree.FileNode, _ int) (string, bool) {
+		return node.GetPath(), node.IsFile()
+	})
+
+	if len(paths) == 1 {
+		if line := self.firstChangedLine(nodes[0]); line > 0 {
+			return self.c.Helpers().Files.EditFileAtLine(paths[0], line)
+		}
+	}
+
+	return self.c.Helpers().Files.EditFiles(paths)
+}
+
+func (self *FilesController) firstChangedLine(node *filetree.FileNode) int {
+	if node == nil || node.File == nil {
+		return 0
+	}
+	file := node.File
+	if !file.HasUnstagedChanges && !file.HasStagedChanges {
+		return 0
+	}
+
+	var diff string
+	if !file.GetIsTracked() && !file.HasStagedChanges {
+		diff = self.c.Git().WorkingTree.WorktreeFileDiff(file, true, false)
+	} else {
+		diff = self.c.Git().WorkingTree.WorktreeFileCombinedDiff(file, true)
+	}
+	if diff == "" {
+		return 0
+	}
+
+	p := patch.Parse(diff)
+	if !p.ContainsChanges() {
+		return 0
+	}
+	changeIdx := p.GetNextChangeIdx(0)
+	return p.LineNumberOfLine(changeIdx)
 }
 
 func (self *FilesController) canEditFiles(nodes []*filetree.FileNode) *types.DisabledReason {

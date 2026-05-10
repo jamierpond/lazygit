@@ -26,6 +26,7 @@ const (
 	NORMAL_SECONDARY_CONTEXT_KEY         types.ContextKey = "normalSecondary"
 	STAGING_MAIN_CONTEXT_KEY             types.ContextKey = "staging"
 	STAGING_SECONDARY_CONTEXT_KEY        types.ContextKey = "stagingSecondary"
+	DIFF_EXPLORE_CONTEXT_KEY             types.ContextKey = "diffExplore"
 	PATCH_BUILDING_MAIN_CONTEXT_KEY      types.ContextKey = "patchBuilding"
 	PATCH_BUILDING_SECONDARY_CONTEXT_KEY types.ContextKey = "patchBuildingSecondary"
 	MERGE_CONFLICTS_CONTEXT_KEY          types.ContextKey = "mergeConflicts"
@@ -68,6 +69,7 @@ var AllContextKeys = []types.ContextKey{
 	NORMAL_SECONDARY_CONTEXT_KEY,
 	STAGING_MAIN_CONTEXT_KEY,
 	STAGING_SECONDARY_CONTEXT_KEY,
+	DIFF_EXPLORE_CONTEXT_KEY,
 	PATCH_BUILDING_MAIN_CONTEXT_KEY,
 	PATCH_BUILDING_SECONDARY_CONTEXT_KEY,
 	MERGE_CONFLICTS_CONTEXT_KEY,
@@ -104,6 +106,7 @@ type ContextTree struct {
 	NormalSecondary             *MainContext
 	Staging                     *PatchExplorerContext
 	StagingSecondary            *PatchExplorerContext
+	DiffExplore                 *PatchExplorerContext
 	CustomPatchBuilder          *PatchExplorerContext
 	CustomPatchBuilderSecondary types.Context
 	MergeConflicts              *MergeConflictsContext
@@ -151,6 +154,7 @@ func (self *ContextTree) Flatten() []types.Context {
 		self.MergeConflicts,
 		self.StagingSecondary,
 		self.Staging,
+		self.DiffExplore,
 		self.CustomPatchBuilderSecondary,
 		self.CustomPatchBuilder,
 		self.NormalSecondary,

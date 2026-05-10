@@ -54,6 +54,7 @@ func (gui *Gui) resetHelpersAndControllers() {
 	viewHelper := helpers.NewViewHelper(helperCommon, gui.State.Contexts)
 	patchBuildingHelper := helpers.NewPatchBuildingHelper(helperCommon)
 	stagingHelper := helpers.NewStagingHelper(helperCommon)
+	diffExploreHelper := helpers.NewDiffExploreHelper(helperCommon)
 	mergeConflictsHelper := helpers.NewMergeConflictsHelper(helperCommon)
 	searchHelper := helpers.NewSearchHelper(helperCommon)
 
@@ -93,6 +94,7 @@ func (gui *Gui) resetHelpersAndControllers() {
 		Host:            helpers.NewHostHelper(helperCommon),
 		PatchBuilding:   patchBuildingHelper,
 		Staging:         stagingHelper,
+		DiffExplore:     diffExploreHelper,
 		Bisect:          bisectHelper,
 		Suggestions:     suggestionsHelper,
 		Files:           helpers.NewFilesHelper(helperCommon),
@@ -303,6 +305,12 @@ func (gui *Gui) resetHelpersAndControllers() {
 		stagingSecondaryController,
 		patchExplorerControllerFactory.Create(gui.State.Contexts.StagingSecondary),
 		verticalScrollControllerFactory.Create(gui.State.Contexts.StagingSecondary),
+	)
+
+	controllers.AttachControllers(gui.State.Contexts.DiffExplore,
+		controllers.NewDiffExploreController(common, gui.State.Contexts.DiffExplore),
+		patchExplorerControllerFactory.Create(gui.State.Contexts.DiffExplore),
+		verticalScrollControllerFactory.Create(gui.State.Contexts.DiffExplore),
 	)
 
 	controllers.AttachControllers(gui.State.Contexts.CustomPatchBuilder,

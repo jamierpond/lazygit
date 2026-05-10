@@ -30,6 +30,7 @@ type Helpers struct {
 	Host           *HostHelper
 	PatchBuilding  *PatchBuildingHelper
 	Staging        *StagingHelper
+	DiffExplore    *DiffExploreHelper
 	GPG            *GpgHelper
 	Upstream       *UpstreamHelper
 	AmendHelper    *AmendHelper
@@ -69,6 +70,7 @@ func NewStubHelpers() *Helpers {
 		Host:              &HostHelper{},
 		PatchBuilding:     &PatchBuildingHelper{},
 		Staging:           &StagingHelper{},
+		DiffExplore:       &DiffExploreHelper{},
 		GPG:               &GpgHelper{},
 		Upstream:          &UpstreamHelper{},
 		AmendHelper:       &AmendHelper{},

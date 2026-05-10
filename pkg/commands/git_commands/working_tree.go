@@ -389,6 +389,31 @@ func (self *WorkingTreeCommands) WorktreeFileDiff(file *models.File, plain bool,
 	return s
 }
 
+// WorktreeFileCombinedDiff returns the combined HEAD-vs-worktree diff for a file
+// (staged + unstaged changes together).
+func (self *WorkingTreeCommands) WorktreeFileCombinedDiff(file *models.File, plain bool) string {
+	colorArg := self.pagerConfig.GetColorArg()
+	if plain {
+		colorArg = "never"
+	}
+	contextSize := self.UserConfig().Git.DiffContextSize
+
+	cmdArgs := NewGitCmd("diff").
+		Arg("--submodule").
+		Arg(fmt.Sprintf("--unified=%d", contextSize)).
+		Arg(fmt.Sprintf("--color=%s", colorArg)).
+		ArgIf(!plain && self.UserConfig().Git.IgnoreWhitespaceInDiffView, "--ignore-all-space").
+		Arg(fmt.Sprintf("--find-renames=%d%%", self.UserConfig().Git.RenameSimilarityThreshold)).
+		Arg("HEAD").
+		Arg("--").
+		Arg(file.GetPath()).
+		Dir(self.repoPaths.worktreePath).
+		ToArgv()
+
+	s, _ := self.cmd.New(cmdArgs).DontLog().RunWithOutput()
+	return s
+}
+
 // WorktreeFileDiffCmdObj returns a command object for diffing a file or directory
 // in the working tree. When pathOverrides is non-empty, those paths are used instead of
 // the node's path (used to diff only filtered/visible files within a directory).

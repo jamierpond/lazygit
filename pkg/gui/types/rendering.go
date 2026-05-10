@@ -18,6 +18,7 @@ type MainViewPairs struct {
 	MergeConflicts MainContextPair
 	Staging        MainContextPair
 	PatchBuilding  MainContextPair
+	DiffExplore    MainContextPair
 }
 
 type ViewUpdateOpts struct {

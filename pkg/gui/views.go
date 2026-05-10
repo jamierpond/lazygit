@@ -46,6 +46,7 @@ func (gui *Gui) orderedViewNameMappings() []viewNameMapping {
 		{viewPtr: &gui.Views.PatchBuilding, name: "patchBuilding"},
 		{viewPtr: &gui.Views.PatchBuildingSecondary, name: "patchBuildingSecondary"},
 		{viewPtr: &gui.Views.MergeConflicts, name: "mergeConflicts"},
+		{viewPtr: &gui.Views.DiffExplore, name: "diffExplore"},
 		{viewPtr: &gui.Views.Secondary, name: "secondary"},
 		{viewPtr: &gui.Views.Main, name: "main"},
 
@@ -100,7 +101,7 @@ func (gui *Gui) createAllViews() error {
 	gui.Views.Search.Frame = false
 	gui.Views.Search.Editor = gocui.EditorFunc(gui.searchEditor)
 
-	for _, view := range []*gocui.View{gui.Views.Main, gui.Views.Secondary, gui.Views.Staging, gui.Views.StagingSecondary, gui.Views.PatchBuilding, gui.Views.PatchBuildingSecondary, gui.Views.MergeConflicts} {
+	for _, view := range []*gocui.View{gui.Views.Main, gui.Views.Secondary, gui.Views.Staging, gui.Views.StagingSecondary, gui.Views.PatchBuilding, gui.Views.PatchBuildingSecondary, gui.Views.MergeConflicts, gui.Views.DiffExplore} {
 		view.Wrap = true
 		view.UnderlineHyperLinksOnlyOnHover = true
 		view.AutoRenderHyperLinks = true
@@ -111,6 +112,7 @@ func (gui *Gui) createAllViews() error {
 	gui.Views.PatchBuilding.Wrap = true
 	gui.Views.PatchBuildingSecondary.Wrap = true
 	gui.Views.MergeConflicts.Wrap = false
+	gui.Views.DiffExplore.Wrap = true
 	gui.Views.Limit.Wrap = true
 
 	gui.Views.AppStatus.BgColor = gocui.ColorDefault
@@ -194,12 +196,13 @@ func (gui *Gui) configureViewProperties() {
 	gui.Views.Status.Title = gui.c.Tr.StatusTitle
 	gui.Views.Staging.Title = gui.c.Tr.UnstagedChanges
 	gui.Views.StagingSecondary.Title = gui.c.Tr.StagedChanges
+	gui.Views.DiffExplore.Title = gui.c.Tr.DiffTitle
 	gui.Views.CommitMessage.Title = gui.c.Tr.CommitSummary
 	gui.Views.CommitDescription.Title = gui.c.Tr.CommitDescriptionTitle
 	gui.Views.Extras.Title = gui.c.Tr.CommandLog
 	gui.Views.Snake.Title = gui.c.Tr.SnakeTitle
 
-	for _, view := range []*gocui.View{gui.Views.Main, gui.Views.Secondary, gui.Views.Staging, gui.Views.StagingSecondary, gui.Views.PatchBuilding, gui.Views.PatchBuildingSecondary, gui.Views.MergeConflicts} {
+	for _, view := range []*gocui.View{gui.Views.Main, gui.Views.Secondary, gui.Views.Staging, gui.Views.StagingSecondary, gui.Views.PatchBuilding, gui.Views.PatchBuildingSecondary, gui.Views.MergeConflicts, gui.Views.DiffExplore} {
 		view.Title = gui.c.Tr.DiffTitle
 		view.CanScrollPastBottom = gui.c.UserConfig().Gui.ScrollPastBottom
 		view.TabWidth = gui.c.UserConfig().Gui.TabWidth

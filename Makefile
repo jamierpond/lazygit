@@ -9,6 +9,12 @@ build:
 install:
 	go install
 
+PREFIX ?= $(HOME)/.local
+.PHONY: install-local
+install-local:
+	mkdir -p $(PREFIX)/bin
+	go build -o $(PREFIX)/bin/lazygit .
+
 .PHONY: run
 run: build
 	./lazygit

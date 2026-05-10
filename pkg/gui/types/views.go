@@ -22,6 +22,7 @@ type Views struct {
 	PatchBuilding          *gocui.View
 	PatchBuildingSecondary *gocui.View
 	MergeConflicts         *gocui.View
+	DiffExplore            *gocui.View
 
 	Options           *gocui.View
 	Confirmation      *gocui.View

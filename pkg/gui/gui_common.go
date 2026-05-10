@@ -138,6 +138,7 @@ func (self *guiCommon) MainViewPairs() types.MainViewPairs {
 		Staging:        self.gui.stagingMainContextPair(),
 		PatchBuilding:  self.gui.patchBuildingMainContextPair(),
 		MergeConflicts: self.gui.mergingMainContextPair(),
+		DiffExplore:    self.gui.diffExploreMainContextPair(),
 	}
 }
 

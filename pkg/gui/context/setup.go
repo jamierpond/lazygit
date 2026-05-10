@@ -55,6 +55,13 @@ func NewContextTree(c *ContextCommon) *ContextTree {
 			func() []int { return nil },
 			c,
 		),
+		DiffExplore: NewPatchExplorerContext(
+			c.Views().DiffExplore,
+			"main",
+			DIFF_EXPLORE_CONTEXT_KEY,
+			func() []int { return nil },
+			c,
+		),
 		CustomPatchBuilder: NewPatchExplorerContext(
 			c.Views().PatchBuilding,
 			"main",

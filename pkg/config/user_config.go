@@ -173,9 +173,10 @@ type GuiConfig struct {
 	// Height of the command log view
 	CommandLogSize int `yaml:"commandLogSize" jsonschema:"minimum=0"`
 	// Whether to split the main window when viewing file changes.
-	// One of: 'auto' | 'always'
+	// One of: 'auto' | 'always' | 'never'
 	// If 'auto', only split the main window when a file has both staged and unstaged changes
-	SplitDiff string `yaml:"splitDiff" jsonschema:"enum=auto,enum=always"`
+	// If 'never', never split — show the combined working-tree diff only
+	SplitDiff string `yaml:"splitDiff" jsonschema:"enum=auto,enum=always,enum=never"`
 	// Default size for focused window. Can be changed from within Lazygit with '+' and '_' (but this won't change the default).
 	// One of: 'normal' (default) | 'half' | 'full'
 	ScreenMode string `yaml:"screenMode" jsonschema:"enum=normal,enum=half,enum=full"`

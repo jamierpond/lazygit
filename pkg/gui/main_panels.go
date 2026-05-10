@@ -83,6 +83,13 @@ func (gui *Gui) stagingMainContextPair() types.MainContextPair {
 	)
 }
 
+func (gui *Gui) diffExploreMainContextPair() types.MainContextPair {
+	return types.NewMainContextPair(
+		gui.State.Contexts.DiffExplore,
+		nil,
+	)
+}
+
 func (gui *Gui) patchBuildingMainContextPair() types.MainContextPair {
 	return types.NewMainContextPair(
 		gui.State.Contexts.CustomPatchBuilder,

@@ -315,14 +315,26 @@ func (self *FilesController) GetOnRenderToMain() func() {
 
 			self.c.Helpers().MergeConflicts.ResetMergeState()
 
-			split := self.c.UserConfig().Gui.SplitDiff == "always" || (node.GetHasUnstagedChanges() && node.GetHasStagedChanges())
-			mainShowsStaged := !split && node.GetHasStagedChanges()
+			splitDiffMode := self.c.UserConfig().Gui.SplitDiff
+			hasBoth := node.GetHasUnstagedChanges() && node.GetHasStagedChanges()
+			split := splitDiffMode == "always" || (splitDiffMode != "never" && hasBoth)
+			combined := splitDiffMode == "never" && hasBoth
+			mainShowsStaged := !split && !combined && node.GetHasStagedChanges()
 
 			pathOverrides := self.pathOverridesForDiff(node)
 			cmdObj := self.c.Git().WorkingTree.WorktreeFileDiffCmdObj(node, false, mainShowsStaged, pathOverrides)
 			title := self.c.Tr.UnstagedChanges
 			if mainShowsStaged {
 				title = self.c.Tr.StagedChanges
+			}
+			if combined {
+				paths := pathOverrides
+				if len(paths) == 0 {
+					paths = []string{node.GetPath()}
+				}
+				args := append([]string{"HEAD", "--"}, paths...)
+				cmdObj = self.c.Git().Diff.DiffCmdObj(args)
+				title = self.c.Tr.DiffTitle
 			}
 			refreshOpts := types.RefreshMainOpts{
 				Pair: self.c.MainViewPairs().Normal,
@@ -650,9 +662,14 @@ func (self *FilesController) EnterFile(opts types.OnFocusOpts) error {
 		return self.handleNonInlineConflict(file)
 	}
 
-	context := lo.Ternary(opts.ClickedWindowName == "secondary", self.c.Contexts().StagingSecondary, self.c.Contexts().Staging)
-	self.c.Context().Push(context, opts)
-	self.c.Helpers().PatchBuilding.ShowHunkStagingHint()
+	if opts.ClickedWindowName == "secondary" {
+		self.c.Context().Push(self.c.Contexts().StagingSecondary, opts)
+	} else if self.c.UserConfig().Gui.SplitDiff == "never" {
+		self.c.Context().Push(self.c.Contexts().DiffExplore, opts)
+	} else {
+		self.c.Context().Push(self.c.Contexts().Staging, opts)
+		self.c.Helpers().PatchBuilding.ShowHunkStagingHint()
+	}
 
 	return nil
 }

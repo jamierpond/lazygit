@@ -6,8 +6,9 @@ import (
 
 type DiffExploreController struct {
 	baseController
-	c       *ControllerCommon
-	context types.IPatchExplorerContext
+	c                  *ControllerCommon
+	context            types.IPatchExplorerContext
+	prevExtrasVisible  bool
 }
 
 func NewDiffExploreController(c *ControllerCommon, context types.IPatchExplorerContext) *DiffExploreController {
@@ -92,6 +93,8 @@ func (self *DiffExploreController) escape() error {
 func (self *DiffExploreController) GetOnFocus() func(types.OnFocusOpts) {
 	return func(opts types.OnFocusOpts) {
 		self.c.Views().DiffExplore.Wrap = self.c.UserConfig().Gui.WrapLinesInStagingView
+		self.prevExtrasVisible = self.c.State().GetShowExtrasWindow()
+		self.c.State().SetShowExtrasWindow(false)
 		self.c.Helpers().DiffExplore.RefreshDiffExplorePanel(opts)
 	}
 }
@@ -101,6 +104,7 @@ func (self *DiffExploreController) GetOnFocusLost() func(types.OnFocusLostOpts) 
 		self.context.SetState(nil)
 		if opts.NewContextKey != self.context.GetKey() {
 			self.c.Views().DiffExplore.Wrap = true
+			self.c.State().SetShowExtrasWindow(self.prevExtrasVisible)
 		}
 	}
 }

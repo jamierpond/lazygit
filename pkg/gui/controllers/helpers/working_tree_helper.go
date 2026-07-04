@@ -10,7 +10,6 @@ import (
 	"github.com/jesseduffield/lazygit/pkg/commands/git_commands"
 	"github.com/jesseduffield/lazygit/pkg/commands/models"
 	"github.com/jesseduffield/lazygit/pkg/config"
-	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/context"
 	"github.com/jesseduffield/lazygit/pkg/gui/style"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
@@ -148,11 +147,11 @@ func (self *WorkingTreeHelper) HandleCommitPressWithMessage(initialMessage strin
 func (self *WorkingTreeHelper) handleCommit(summary string, description string, forceSkipHooks bool) error {
 	cmdObj := self.c.Git().Commit.CommitCmdObj(summary, description, forceSkipHooks)
 	self.c.LogAction(self.c.Tr.Actions.Commit)
-	return self.gpgHelper.WithGpgHandling(cmdObj, git_commands.CommitGpgSign, self.c.Tr.CommittingStatus,
+	return self.gpgHelper.WithGpgHandlingAndSelectHeadCommit(cmdObj, git_commands.CommitGpgSign, self.c.Tr.CommittingStatus,
 		func() error {
 			self.commitsHelper.ClearPreservedCommitMessage()
 			return nil
-		}, nil)
+		})
 }
 
 func (self *WorkingTreeHelper) switchFromCommitMessagePanelToEditor(filepath string, forceSkipHooks bool) error {
@@ -383,7 +382,7 @@ func (self *WorkingTreeHelper) CreateMergeConflictMenu(selectedFilepaths []strin
 				OnPress: func() error {
 					return onMergeStrategySelected("--ours")
 				},
-				Key: gocui.NewKeyRune('c'),
+				Keys: menuKey('c'),
 			},
 			{
 				LabelColumns: []string{
@@ -393,7 +392,7 @@ func (self *WorkingTreeHelper) CreateMergeConflictMenu(selectedFilepaths []strin
 				OnPress: func() error {
 					return onMergeStrategySelected("--theirs")
 				},
-				Key: gocui.NewKeyRune('i'),
+				Keys: menuKey('i'),
 			},
 			{
 				LabelColumns: []string{
@@ -403,7 +402,7 @@ func (self *WorkingTreeHelper) CreateMergeConflictMenu(selectedFilepaths []strin
 				OnPress: func() error {
 					return onMergeStrategySelected("--union")
 				},
-				Key: gocui.NewKeyRune('b'),
+				Keys: menuKey('b'),
 			},
 			{
 				LabelColumns: []string{
@@ -411,7 +410,7 @@ func (self *WorkingTreeHelper) CreateMergeConflictMenu(selectedFilepaths []strin
 					cmdColor.Sprint("git mergetool"),
 				},
 				OnPress: self.OpenMergeTool,
-				Key:     gocui.NewKeyRune('m'),
+				Keys:    menuKey('m'),
 			},
 		},
 	})

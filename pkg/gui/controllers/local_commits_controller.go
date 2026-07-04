@@ -8,7 +8,6 @@ import (
 	"github.com/jesseduffield/lazygit/pkg/commands/models"
 	"github.com/jesseduffield/lazygit/pkg/gocui"
 	"github.com/jesseduffield/lazygit/pkg/gui/context"
-	"github.com/jesseduffield/lazygit/pkg/gui/context/traits"
 	"github.com/jesseduffield/lazygit/pkg/gui/controllers/helpers"
 	"github.com/jesseduffield/lazygit/pkg/gui/style"
 	"github.com/jesseduffield/lazygit/pkg/gui/types"
@@ -56,7 +55,7 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 
 	bindings := []*types.Binding{
 		{
-			Key:     opts.GetKey(opts.Config.Commits.SquashDown),
+			Keys:    opts.GetKeys(opts.Config.Commits.SquashDown),
 			Handler: opts.Guards.OutsideFilterMode(self.withItemsRange(self.squashDown)),
 			GetDisabledReason: self.require(
 				self.itemRangeSelected(
@@ -69,7 +68,7 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			DisplayOnScreen: true,
 		},
 		{
-			Key:     opts.GetKey(opts.Config.Commits.MarkCommitAsFixup),
+			Keys:    opts.GetKeys(opts.Config.Commits.MarkCommitAsFixup),
 			Handler: opts.Guards.OutsideFilterMode(self.withItemsRange(self.fixup)),
 			GetDisabledReason: self.require(
 				self.itemRangeSelected(
@@ -82,7 +81,7 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			DisplayOnScreen: true,
 		},
 		{
-			Key:     opts.GetKey(opts.Config.Commits.SetFixupMessage),
+			Keys:    opts.GetKeys(opts.Config.Commits.SetFixupMessage),
 			Handler: self.withItem(self.setFixupMessage),
 			GetDisabledReason: self.require(
 				self.singleItemSelected(self.canSetFixupMessage),
@@ -91,7 +90,7 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			Tooltip:     self.c.Tr.SetFixupMessageTooltip,
 		},
 		{
-			Key:     opts.GetKey(opts.Config.Commits.RenameCommit),
+			Keys:    opts.GetKeys(opts.Config.Commits.RenameCommit),
 			Handler: self.withItem(self.reword),
 			GetDisabledReason: self.require(
 				self.singleItemSelected(self.rewordEnabled),
@@ -102,7 +101,7 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			OpensMenu:       true,
 		},
 		{
-			Key:     opts.GetKey(opts.Config.Commits.RenameCommitWithEditor),
+			Keys:    opts.GetKeys(opts.Config.Commits.RenameCommitWithEditor),
 			Handler: self.withItem(self.rewordEditor),
 			GetDisabledReason: self.require(
 				self.singleItemSelected(self.rewordEnabled),
@@ -110,7 +109,7 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			Description: self.c.Tr.RewordCommitEditor,
 		},
 		{
-			Key:     opts.GetKey(opts.Config.Universal.Remove),
+			Keys:    opts.GetKeys(opts.Config.Universal.Remove),
 			Handler: self.withItemsRange(self.drop),
 			GetDisabledReason: self.require(
 				self.itemRangeSelected(
@@ -122,7 +121,7 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			DisplayOnScreen: true,
 		},
 		{
-			Key:     opts.GetKey(editCommitKey),
+			Keys:    opts.GetKeys(editCommitKey),
 			Handler: opts.Guards.OutsideFilterMode(self.withItemsRange(self.edit)),
 			GetDisabledReason: self.require(
 				self.itemRangeSelected(self.midRebaseCommandEnabled),
@@ -136,16 +135,16 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			// The user-facing description here is 'Start interactive rebase' but internally
 			// we're calling it 'quick-start interactive rebase' to differentiate it from
 			// when you manually select the base commit.
-			Key:               opts.GetKey(opts.Config.Commits.StartInteractiveRebase),
+			Keys:              opts.GetKeys(opts.Config.Commits.StartInteractiveRebase),
 			Handler:           opts.Guards.OutsideFilterMode(self.quickStartInteractiveRebase),
 			GetDisabledReason: self.require(self.notMidRebase(self.c.Tr.AlreadyRebasing), self.canFindCommitForQuickStart),
 			Description:       self.c.Tr.QuickStartInteractiveRebase,
 			Tooltip: utils.ResolvePlaceholderString(self.c.Tr.QuickStartInteractiveRebaseTooltip, map[string]string{
-				"editKey": editCommitKey,
+				"editKey": editCommitKey.String(),
 			}),
 		},
 		{
-			Key:     opts.GetKey(opts.Config.Commits.PickCommit),
+			Keys:    opts.GetKeys(opts.Config.Commits.PickCommit),
 			Handler: opts.Guards.OutsideFilterMode(self.withItems(self.pick)),
 			GetDisabledReason: self.require(
 				self.itemRangeSelected(self.pickEnabled),
@@ -154,19 +153,19 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			Tooltip:     self.c.Tr.PickCommitTooltip,
 		},
 		{
-			Key:               opts.GetKey(opts.Config.Commits.CreateFixupCommit),
+			Keys:              opts.GetKeys(opts.Config.Commits.CreateFixupCommit),
 			Handler:           opts.Guards.OutsideFilterMode(self.withItem(self.createFixupCommit)),
 			GetDisabledReason: self.require(self.singleItemSelected()),
 			Description:       self.c.Tr.CreateFixupCommit,
 			Tooltip: utils.ResolvePlaceholderString(
 				self.c.Tr.CreateFixupCommitTooltip,
 				map[string]string{
-					"squashAbove": opts.Config.Commits.SquashAboveCommits,
+					"squashAbove": opts.Config.Commits.SquashAboveCommits.String(),
 				},
 			),
 		},
 		{
-			Key:     opts.GetKey(opts.Config.Commits.SquashAboveCommits),
+			Keys:    opts.GetKeys(opts.Config.Commits.SquashAboveCommits),
 			Handler: opts.Guards.OutsideFilterMode(self.squashFixupCommits),
 			GetDisabledReason: self.require(
 				self.notMidRebase(self.c.Tr.AlreadyRebasing),
@@ -176,7 +175,7 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			OpensMenu:   true,
 		},
 		{
-			Key:     opts.GetKey(opts.Config.Commits.MoveDownCommit),
+			Keys:    opts.GetKeys(opts.Config.Commits.MoveDownCommit),
 			Handler: opts.Guards.OutsideFilterMode(self.withItemsRange(self.moveDown)),
 			GetDisabledReason: self.require(self.itemRangeSelected(
 				self.midRebaseMoveCommandEnabled,
@@ -185,7 +184,7 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			Description: self.c.Tr.MoveDownCommit,
 		},
 		{
-			Key:     opts.GetKey(opts.Config.Commits.MoveUpCommit),
+			Keys:    opts.GetKeys(opts.Config.Commits.MoveUpCommit),
 			Handler: opts.Guards.OutsideFilterMode(self.withItemsRange(self.moveUp)),
 			GetDisabledReason: self.require(self.itemRangeSelected(
 				self.midRebaseMoveCommandEnabled,
@@ -194,14 +193,14 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			Description: self.c.Tr.MoveUpCommit,
 		},
 		{
-			Key:               opts.GetKey(opts.Config.Commits.PasteCommits),
+			Keys:              opts.GetKeys(opts.Config.Commits.PasteCommits),
 			Handler:           opts.Guards.OutsideFilterMode(self.paste),
 			GetDisabledReason: self.require(self.canPaste),
 			Description:       self.c.Tr.PasteCommits,
 			DisplayStyle:      &style.FgCyan,
 		},
 		{
-			Key:               opts.GetKey(opts.Config.Commits.MarkCommitAsBaseForRebase),
+			Keys:              opts.GetKeys(opts.Config.Commits.MarkCommitAsBaseForRebase),
 			Handler:           opts.Guards.OutsideFilterMode(self.withItem(self.markAsBaseCommit)),
 			GetDisabledReason: self.require(self.singleItemSelected()),
 			Description:       self.c.Tr.MarkAsBaseCommit,
@@ -210,13 +209,13 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 		// overriding this navigation keybinding because we might need to load
 		// more commits on demand
 		{
-			Key:         opts.GetKey(opts.Config.Universal.StartSearch),
+			Keys:        opts.GetKeys(opts.Config.Universal.StartSearch),
 			Handler:     self.openSearch,
 			Description: self.c.Tr.StartSearch,
 			Tag:         "navigation",
 		},
 		{
-			Key:               opts.GetKey(opts.Config.Commits.AmendToCommit),
+			Keys:              opts.GetKeys(opts.Config.Commits.AmendToCommit),
 			Handler:           self.withItem(self.amendTo),
 			GetDisabledReason: self.require(self.singleItemSelected(self.canAmend)),
 			Description:       self.c.Tr.Amend,
@@ -224,7 +223,7 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			DisplayOnScreen:   true,
 		},
 		{
-			Key:               opts.GetKey(opts.Config.Commits.ResetCommitAuthor),
+			Keys:              opts.GetKeys(opts.Config.Commits.ResetCommitAuthor),
 			Handler:           self.withItemsRange(self.amendAttribute),
 			GetDisabledReason: self.require(self.itemRangeSelected(self.canAmendRange)),
 			Description:       self.c.Tr.AmendCommitAttribute,
@@ -232,28 +231,28 @@ func (self *LocalCommitsController) GetKeybindings(opts types.KeybindingsOpts) [
 			OpensMenu:         true,
 		},
 		{
-			Key:               opts.GetKey(opts.Config.Commits.RevertCommit),
+			Keys:              opts.GetKeys(opts.Config.Commits.RevertCommit),
 			Handler:           self.withItemsRange(self.revert),
 			GetDisabledReason: self.require(self.itemRangeSelected()),
 			Description:       self.c.Tr.Revert,
 			Tooltip:           self.c.Tr.RevertCommitTooltip,
 		},
 		{
-			Key:               opts.GetKey(opts.Config.Commits.CreateTag),
+			Keys:              opts.GetKeys(opts.Config.Commits.CreateTag),
 			Handler:           self.withItem(self.createTag),
 			GetDisabledReason: self.require(self.singleItemSelected()),
 			Description:       self.c.Tr.TagCommit,
 			Tooltip:           self.c.Tr.TagCommitTooltip,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Commits.OpenLogMenu),
+			Keys:        opts.GetKeys(opts.Config.Commits.OpenLogMenu),
 			Handler:     self.handleOpenLogMenu,
 			Description: self.c.Tr.OpenLogMenu,
 			Tooltip:     self.c.Tr.OpenLogMenuTooltip,
 			OpensMenu:   true,
 		},
 		{
-			Key:               opts.GetKey(opts.Config.Commits.OpenPullRequestInBrowser),
+			Keys:              opts.GetKeys(opts.Config.Commits.OpenPullRequestInBrowser),
 			Handler:           self.openPRInBrowser,
 			GetDisabledReason: self.checkedOutBranchHasPR,
 			Description:       self.c.Tr.OpenPullRequestInBrowser,
@@ -361,7 +360,7 @@ func (self *LocalCommitsController) fixup(selectedCommits []*models.Commit, star
 		Items: []*types.MenuItem{
 			{
 				Label: self.c.Tr.Fixup,
-				Key:   gocui.NewKeyRune('f'),
+				Keys:  menuKey('f'),
 				OnPress: func() error {
 					return self.c.WithWaitingStatus(self.c.Tr.FixingStatus, func(gocui.Task) error {
 						self.c.LogAction(self.c.Tr.Actions.FixupCommit)
@@ -372,7 +371,7 @@ func (self *LocalCommitsController) fixup(selectedCommits []*models.Commit, star
 			},
 			{
 				Label: self.c.Tr.FixupKeepMessage,
-				Key:   gocui.NewKeyRune('c'),
+				Keys:  menuKey('c'),
 				OnPress: func() error {
 					return self.c.WithWaitingStatus(self.c.Tr.FixingStatus, func(gocui.Task) error {
 						self.c.LogAction(self.c.Tr.Actions.FixupCommitKeepMessage)
@@ -403,7 +402,7 @@ func (self *LocalCommitsController) setFixupMessage(commit *models.Commit) error
 		Items: []*types.MenuItem{
 			{
 				Label: self.c.Tr.FixupDiscardMessage,
-				Key:   gocui.NewKeyRune('f'),
+				Keys:  menuKey('f'),
 				OnPress: func() error {
 					return self.updateTodosWithFlag(todo.Fixup, []*models.Commit{commit}, "")
 				},
@@ -411,7 +410,7 @@ func (self *LocalCommitsController) setFixupMessage(commit *models.Commit) error
 			},
 			{
 				Label: self.c.Tr.FixupKeepMessage,
-				Key:   gocui.NewKeyRune('c'),
+				Keys:  menuKey('c'),
 				OnPress: func() error {
 					return self.updateTodosWithFlag(todo.Fixup, []*models.Commit{commit}, "-C")
 				},
@@ -590,15 +589,9 @@ func (self *LocalCommitsController) edit(selectedCommits []*models.Commit, start
 
 	commits := self.c.Model().Commits
 	if !commits[endIdx].IsMerge() {
-		selectionRangeAndMode := self.getSelectionRangeAndMode()
 		err := self.c.Git().Rebase.InteractiveRebase(commits, startIdx, endIdx, todo.Edit, "")
 		return self.c.Helpers().MergeAndRebase.CheckMergeOrRebaseWithRefreshOptions(
-			err,
-			types.RefreshOptions{
-				Mode: types.BLOCK_UI, Then: func() {
-					self.restoreSelectionRangeAndMode(selectionRangeAndMode)
-				},
-			})
+			err, types.RefreshOptions{Mode: types.BLOCK_UI})
 	}
 
 	return self.startInteractiveRebaseWithEdit(selectedCommits)
@@ -618,7 +611,6 @@ func (self *LocalCommitsController) startInteractiveRebaseWithEdit(
 ) error {
 	return self.c.WithWaitingStatus(self.c.Tr.RebasingStatus, func(gocui.Task) error {
 		self.c.LogAction(self.c.Tr.Actions.EditCommit)
-		selectionRangeAndMode := self.getSelectionRangeAndMode()
 		err := self.c.Git().Rebase.EditRebase(commitsToEdit[len(commitsToEdit)-1].Hash())
 		return self.c.Helpers().MergeAndRebase.CheckMergeOrRebaseWithRefreshOptions(
 			err,
@@ -636,40 +628,8 @@ func (self *LocalCommitsController) startInteractiveRebaseWithEdit(
 						self.c.Log.Errorf("error when updating todos: %v", err)
 					}
 				}
-
-				self.restoreSelectionRangeAndMode(selectionRangeAndMode)
 			}})
 	})
-}
-
-type SelectionRangeAndMode struct {
-	selectedHash   string
-	rangeStartHash string
-	mode           traits.RangeSelectMode
-}
-
-func (self *LocalCommitsController) getSelectionRangeAndMode() SelectionRangeAndMode {
-	selectedIdx, rangeStartIdx, rangeSelectMode := self.context().GetSelectionRangeAndMode()
-	commits := self.c.Model().Commits
-	selectedHash := commits[selectedIdx].Hash()
-	rangeStartHash := commits[rangeStartIdx].Hash()
-	return SelectionRangeAndMode{selectedHash, rangeStartHash, rangeSelectMode}
-}
-
-func (self *LocalCommitsController) restoreSelectionRangeAndMode(selectionRangeAndMode SelectionRangeAndMode) {
-	// We need to select the same commit range again because after starting a rebase,
-	// new lines can be added for update-ref commands in the TODO file, due to
-	// stacked branches. So the selected commits may be in different positions in the list.
-	_, newSelectedIdx, ok1 := lo.FindIndexOf(self.c.Model().Commits, func(c *models.Commit) bool {
-		return c.Hash() == selectionRangeAndMode.selectedHash
-	})
-	_, newRangeStartIdx, ok2 := lo.FindIndexOf(self.c.Model().Commits, func(c *models.Commit) bool {
-		return c.Hash() == selectionRangeAndMode.rangeStartHash
-	})
-	if ok1 && ok2 {
-		self.context().SetSelectionRangeAndMode(newSelectedIdx, newRangeStartIdx, selectionRangeAndMode.mode)
-		self.context().HandleFocus(types.OnFocusOpts{})
-	}
 }
 
 func (self *LocalCommitsController) findCommitForQuickStartInteractiveRebase() (*models.Commit, error) {
@@ -679,7 +639,7 @@ func (self *LocalCommitsController) findCommitForQuickStartInteractiveRebase() (
 
 	if !ok || index == 0 {
 		errorMsg := utils.ResolvePlaceholderString(self.c.Tr.CannotQuickStartInteractiveRebase, map[string]string{
-			"editKey": self.c.UserConfig().Keybinding.Universal.Edit,
+			"editKey": self.c.UserConfig().Keybinding.Universal.Edit.String(),
 		})
 
 		return nil, errors.New(errorMsg)
@@ -767,7 +727,9 @@ func (self *LocalCommitsController) moveDown(selectedCommits []*models.Commit, s
 		self.context().HandleFocus(types.OnFocusOpts{ScrollSelectionIntoView: true})
 
 		self.c.Refresh(types.RefreshOptions{
-			Mode: types.SYNC, Scope: []types.RefreshableView{types.REBASE_COMMITS},
+			Mode:            types.SYNC,
+			Scope:           []types.RefreshableView{types.REBASE_COMMITS},
+			CommitSelection: types.KeepCommitSelectionIndex,
 		})
 		return nil
 	}
@@ -780,7 +742,7 @@ func (self *LocalCommitsController) moveDown(selectedCommits []*models.Commit, s
 			self.context().HandleFocus(types.OnFocusOpts{ScrollSelectionIntoView: true})
 		}
 		return self.c.Helpers().MergeAndRebase.CheckMergeOrRebaseWithRefreshOptions(
-			err, types.RefreshOptions{Mode: types.SYNC})
+			err, types.RefreshOptions{Mode: types.SYNC, CommitSelection: types.KeepCommitSelectionIndex})
 	})
 }
 
@@ -793,7 +755,9 @@ func (self *LocalCommitsController) moveUp(selectedCommits []*models.Commit, sta
 		self.context().HandleFocus(types.OnFocusOpts{ScrollSelectionIntoView: true})
 
 		self.c.Refresh(types.RefreshOptions{
-			Mode: types.SYNC, Scope: []types.RefreshableView{types.REBASE_COMMITS},
+			Mode:            types.SYNC,
+			Scope:           []types.RefreshableView{types.REBASE_COMMITS},
+			CommitSelection: types.KeepCommitSelectionIndex,
 		})
 		return nil
 	}
@@ -806,7 +770,7 @@ func (self *LocalCommitsController) moveUp(selectedCommits []*models.Commit, sta
 			self.context().HandleFocus(types.OnFocusOpts{ScrollSelectionIntoView: true})
 		}
 		return self.c.Helpers().MergeAndRebase.CheckMergeOrRebaseWithRefreshOptions(
-			err, types.RefreshOptions{Mode: types.SYNC})
+			err, types.RefreshOptions{Mode: types.SYNC, CommitSelection: types.KeepCommitSelectionIndex})
 	})
 }
 
@@ -864,19 +828,19 @@ func (self *LocalCommitsController) amendAttribute(commits []*models.Commit, sta
 			{
 				Label:   self.c.Tr.ResetAuthor,
 				OnPress: func() error { return self.resetAuthor(start, end) },
-				Key:     opts.GetKey(opts.Config.AmendAttribute.ResetAuthor),
+				Keys:    opts.GetKeys(opts.Config.AmendAttribute.ResetAuthor),
 				Tooltip: self.c.Tr.ResetAuthorTooltip,
 			},
 			{
 				Label:   self.c.Tr.SetAuthor,
 				OnPress: func() error { return self.setAuthor(start, end) },
-				Key:     opts.GetKey(opts.Config.AmendAttribute.SetAuthor),
+				Keys:    opts.GetKeys(opts.Config.AmendAttribute.SetAuthor),
 				Tooltip: self.c.Tr.SetAuthorTooltip,
 			},
 			{
 				Label:   self.c.Tr.AddCoAuthor,
 				OnPress: func() error { return self.addCoAuthor(start, end) },
-				Key:     opts.GetKey(opts.Config.AmendAttribute.AddCoAuthor),
+				Keys:    opts.GetKeys(opts.Config.AmendAttribute.AddCoAuthor),
 				Tooltip: self.c.Tr.AddCoAuthorTooltip,
 			},
 		},
@@ -966,8 +930,6 @@ func (self *LocalCommitsController) revert(commits []*models.Commit, start, end 
 				if err := self.c.Helpers().MergeAndRebase.CheckMergeOrRebaseWithRefreshOptions(result, types.RefreshOptions{Mode: types.SYNC}); err != nil {
 					return err
 				}
-				self.context().MoveSelection(len(commits))
-				self.context().HandleFocus(types.OnFocusOpts{ScrollSelectionIntoView: true})
 
 				if mustStash {
 					if err := self.c.Git().Stash.Pop(0); err != nil {
@@ -1000,7 +962,7 @@ func (self *LocalCommitsController) createFixupCommit(commit *models.Commit) err
 		Items: []*types.MenuItem{
 			{
 				Label: self.c.Tr.FixupMenu_Fixup,
-				Key:   gocui.NewKeyRune('f'),
+				Keys:  menuKey('f'),
 				OnPress: func() error {
 					return self.c.Helpers().WorkingTree.WithEnsureCommittableFiles(func() error {
 						self.c.LogAction(self.c.Tr.Actions.CreateFixupCommit)
@@ -1013,7 +975,6 @@ func (self *LocalCommitsController) createFixupCommit(commit *models.Commit) err
 								return err
 							}
 
-							self.context().MoveSelectedLine(1)
 							self.c.Refresh(types.RefreshOptions{Mode: types.SYNC})
 							return nil
 						})
@@ -1024,7 +985,7 @@ func (self *LocalCommitsController) createFixupCommit(commit *models.Commit) err
 			},
 			{
 				Label: self.c.Tr.FixupMenu_AmendWithChanges,
-				Key:   gocui.NewKeyRune('a'),
+				Keys:  menuKey('a'),
 				OnPress: func() error {
 					return self.c.Helpers().WorkingTree.WithEnsureCommittableFiles(func() error {
 						return self.createAmendCommit(commit, true)
@@ -1035,7 +996,7 @@ func (self *LocalCommitsController) createFixupCommit(commit *models.Commit) err
 			},
 			{
 				Label:   self.c.Tr.FixupMenu_AmendWithoutChanges,
-				Key:     gocui.NewKeyRune('r'),
+				Keys:    menuKey('r'),
 				OnPress: func() error { return self.createAmendCommit(commit, false) },
 				Tooltip: self.c.Tr.FixupMenu_AmendWithoutChangesTooltip,
 			},
@@ -1114,7 +1075,6 @@ func (self *LocalCommitsController) createAmendCommit(commit *models.Commit, inc
 						return err
 					}
 
-					self.context().MoveSelectedLine(1)
 					self.c.Refresh(types.RefreshOptions{Mode: types.SYNC})
 					return nil
 				})
@@ -1134,14 +1094,14 @@ func (self *LocalCommitsController) squashFixupCommits() error {
 				Label:          self.c.Tr.SquashCommitsInCurrentBranch,
 				OnPress:        self.squashAllFixupsInCurrentBranch,
 				DisabledReason: self.canFindCommitForSquashFixupsInCurrentBranch(),
-				Key:            gocui.NewKeyRune('b'),
+				Keys:           menuKey('b'),
 				Tooltip:        self.c.Tr.SquashCommitsInCurrentBranchTooltip,
 			},
 			{
 				Label:          self.c.Tr.SquashCommitsAboveSelectedCommit,
 				OnPress:        self.withItem(self.squashAllFixupsAboveSelectedCommit),
 				DisabledReason: self.singleItemSelected()(),
-				Key:            gocui.NewKeyRune('a'),
+				Keys:           menuKey('a'),
 				Tooltip:        self.c.Tr.SquashCommitsAboveSelectedTooltip,
 			},
 		},

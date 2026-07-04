@@ -42,10 +42,11 @@ generate:
 
 .PHONY: format
 format:
-	gofumpt -l -w .
+	go tool gofumpt -l -w .
 
 .PHONY: lint
 lint:
+	./scripts/gofumpt-check.sh
 	./scripts/golangci-lint-shim.sh run
 
 # For more details about integration test, see https://github.com/jesseduffield/lazygit/blob/master/pkg/integration/README.md.
@@ -75,4 +76,4 @@ record-demo:
 
 .PHONY: vendor
 vendor:
-	go mod vendor && go mod tidy
+	go mod tidy && go mod vendor

@@ -66,7 +66,12 @@ func (self *RefsHelper) CheckoutRef(ref string, options types.CheckoutRefOptions
 		if options.RefreshPullRequests {
 			scope = append(scope, types.PULL_REQUESTS)
 		}
-		self.c.Refresh(types.RefreshOptions{Mode: types.BLOCK_UI, Scope: scope, KeepBranchSelectionIndex: true})
+		self.c.Refresh(types.RefreshOptions{
+			Mode:                     types.BLOCK_UI,
+			Scope:                    scope,
+			KeepBranchSelectionIndex: true,
+			CommitSelection:          types.KeepCommitSelectionIndex,
+		})
 	}
 
 	localBranch, found := lo.Find(self.c.Model().Branches, func(branch *models.Branch) bool {
@@ -209,22 +214,22 @@ func (self *RefsHelper) ResetToRef(ref string, strength string, envVars []string
 	// loading a heap of commits is slow so we limit them whenever doing a reset
 	self.c.Contexts().LocalCommits.SetLimitCommits(true)
 
-	self.c.Refresh(types.RefreshOptions{Scope: []types.RefreshableView{types.FILES, types.BRANCHES, types.REFLOG, types.COMMITS}})
+	self.c.Refresh(types.RefreshOptions{Scope: []types.RefreshableView{types.FILES, types.BRANCHES, types.REFLOG, types.COMMITS}, CommitSelection: types.KeepCommitSelectionIndex})
 
 	return nil
 }
 
 func (self *RefsHelper) CreateSortOrderMenu(sortOptionsOrder []string, menuPrompt string, onSelected func(sortOrder string) error, currentValue string) error {
 	type sortMenuOption struct {
-		key         gocui.Key
+		keys        []gocui.Key
 		label       string
 		description string
 		sortOrder   string
 	}
 	availableSortOptions := map[string]sortMenuOption{
-		"recency":      {label: self.c.Tr.SortByRecency, description: self.c.Tr.SortBasedOnReflog, key: gocui.NewKeyRune('r')},
-		"alphabetical": {label: self.c.Tr.SortAlphabetical, description: "--sort=refname", key: gocui.NewKeyRune('a')},
-		"date":         {label: self.c.Tr.SortByDate, description: "--sort=-committerdate", key: gocui.NewKeyRune('d')},
+		"recency":      {label: self.c.Tr.SortByRecency, description: self.c.Tr.SortBasedOnReflog, keys: menuKey('r')},
+		"alphabetical": {label: self.c.Tr.SortAlphabetical, description: "--sort=refname", keys: menuKey('a')},
+		"date":         {label: self.c.Tr.SortByDate, description: "--sort=-committerdate", keys: menuKey('d')},
 	}
 	sortOptions := make([]sortMenuOption, 0, len(sortOptionsOrder))
 	for _, key := range sortOptionsOrder {
@@ -245,7 +250,7 @@ func (self *RefsHelper) CreateSortOrderMenu(sortOptionsOrder []string, menuPromp
 			OnPress: func() error {
 				return onSelected(opt.sortOrder)
 			},
-			Key:    opt.key,
+			Keys:   opt.keys,
 			Widget: types.MakeMenuRadioButton(opt.sortOrder == currentValue),
 		}
 	})
@@ -260,14 +265,14 @@ func (self *RefsHelper) CreateGitResetMenu(name string, ref string) error {
 	type strengthWithKey struct {
 		strength string
 		label    string
-		key      gocui.Key
+		keys     []gocui.Key
 		tooltip  string
 	}
 	strengths := []strengthWithKey{
 		// not i18'ing because it's git terminology
-		{strength: "mixed", label: "Mixed reset", key: gocui.NewKeyRune('m'), tooltip: self.c.Tr.ResetMixedTooltip},
-		{strength: "soft", label: "Soft reset", key: gocui.NewKeyRune('s'), tooltip: self.c.Tr.ResetSoftTooltip},
-		{strength: "hard", label: "Hard reset", key: gocui.NewKeyRune('h'), tooltip: self.c.Tr.ResetHardTooltip},
+		{strength: "mixed", label: "Mixed reset", keys: menuKey('m'), tooltip: self.c.Tr.ResetMixedTooltip},
+		{strength: "soft", label: "Soft reset", keys: menuKey('s'), tooltip: self.c.Tr.ResetSoftTooltip},
+		{strength: "hard", label: "Hard reset", keys: menuKey('h'), tooltip: self.c.Tr.ResetHardTooltip},
 	}
 
 	menuItems := lo.Map(strengths, func(row strengthWithKey, _ int) *types.MenuItem {
@@ -287,7 +292,7 @@ func (self *RefsHelper) CreateGitResetMenu(name string, ref string) error {
 						},
 					})
 			},
-			Key:     row.key,
+			Keys:    row.keys,
 			Tooltip: row.tooltip,
 		}
 	})
@@ -312,15 +317,15 @@ func (self *RefsHelper) CreateCheckoutMenu(commit *models.Commit) error {
 				self.c.LogAction(self.c.Tr.Actions.CheckoutCommit)
 				return self.CheckoutRef(hash, types.CheckoutRefOptions{})
 			},
-			Key: gocui.NewKeyRune('d'),
+			Keys: menuKey('d'),
 		},
 	}
 
 	if len(branches) > 0 {
 		menuItems = append(menuItems, lo.Map(branches, func(branch *models.Branch, index int) *types.MenuItem {
-			var key gocui.Key
+			var keys []gocui.Key
 			if index < 9 {
-				key = gocui.NewKeyRune(rune(index + 1 + '0')) // Convert 1-based index to key
+				keys = menuKey(rune(index + 1 + '0')) // Convert 1-based index to key
 			}
 			return &types.MenuItem{
 				LabelColumns: []string{fmt.Sprintf(self.c.Tr.Actions.CheckoutBranchAtCommit, branch.Name)},
@@ -328,7 +333,7 @@ func (self *RefsHelper) CreateCheckoutMenu(commit *models.Commit) error {
 					self.c.LogAction(self.c.Tr.Actions.CheckoutBranch)
 					return self.CheckoutRef(branch.RefName(), types.CheckoutRefOptions{})
 				},
-				Key: key,
+				Keys: keys,
 			}
 		})...)
 	} else {
@@ -336,7 +341,7 @@ func (self *RefsHelper) CreateCheckoutMenu(commit *models.Commit) error {
 			LabelColumns:   []string{self.c.Tr.Actions.CheckoutBranch},
 			OnPress:        func() error { return nil },
 			DisabledReason: &types.DisabledReason{Text: self.c.Tr.NoBranchesFoundAtCommitTooltip},
-			Key:            gocui.NewKeyRune('1'),
+			Keys:           menuKey('1'),
 		})
 	}
 
@@ -370,7 +375,11 @@ func (self *RefsHelper) NewBranch(from string, fromFormattedName string, suggest
 
 		self.SelectFirstBranchAndFirstCommit()
 
-		self.c.Refresh(types.RefreshOptions{Mode: types.BLOCK_UI, KeepBranchSelectionIndex: true})
+		self.c.Refresh(types.RefreshOptions{
+			Mode:                     types.BLOCK_UI,
+			KeepBranchSelectionIndex: true,
+			CommitSelection:          types.KeepCommitSelectionIndex,
+		})
 	}
 
 	self.c.Prompt(types.PromptOpts{
@@ -525,7 +534,11 @@ func (self *RefsHelper) moveCommitsToNewBranchStackedOnCurrentBranch(newBranchNa
 
 	self.SelectFirstBranchAndFirstCommit()
 
-	self.c.Refresh(types.RefreshOptions{Mode: types.BLOCK_UI, KeepBranchSelectionIndex: true})
+	self.c.Refresh(types.RefreshOptions{
+		Mode:                     types.BLOCK_UI,
+		KeepBranchSelectionIndex: true,
+		CommitSelection:          types.KeepCommitSelectionIndex,
+	})
 	return nil
 }
 
@@ -563,7 +576,11 @@ func (self *RefsHelper) moveCommitsToNewBranchOffOfMainBranch(newBranchName stri
 
 	self.SelectFirstBranchAndFirstCommit()
 
-	self.c.Refresh(types.RefreshOptions{Mode: types.BLOCK_UI, KeepBranchSelectionIndex: true})
+	self.c.Refresh(types.RefreshOptions{
+		Mode:                     types.BLOCK_UI,
+		KeepBranchSelectionIndex: true,
+		CommitSelection:          types.KeepCommitSelectionIndex,
+	})
 	return nil
 }
 

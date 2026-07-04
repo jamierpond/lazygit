@@ -6,9 +6,9 @@ import (
 
 type DiffExploreController struct {
 	baseController
-	c                  *ControllerCommon
-	context            types.IPatchExplorerContext
-	prevExtrasVisible  bool
+	c                 *ControllerCommon
+	context           types.IPatchExplorerContext
+	prevExtrasVisible bool
 }
 
 func NewDiffExploreController(c *ControllerCommon, context types.IPatchExplorerContext) *DiffExploreController {
@@ -26,20 +26,20 @@ func (self *DiffExploreController) Context() types.Context {
 func (self *DiffExploreController) GetKeybindings(opts types.KeybindingsOpts) []*types.Binding {
 	return []*types.Binding{
 		{
-			Key:             opts.GetKey(opts.Config.Universal.Edit),
+			Keys:            opts.GetKeys(opts.Config.Universal.Edit),
 			Handler:         self.editAtCursor,
 			Description:     self.c.Tr.EditFile,
 			Tooltip:         self.c.Tr.EditFileTooltip,
 			DisplayOnScreen: true,
 		},
 		{
-			Key:         opts.GetKey(opts.Config.Universal.OpenFile),
+			Keys:        opts.GetKeys(opts.Config.Universal.OpenFile),
 			Handler:     self.openFile,
 			Description: self.c.Tr.OpenFile,
 			Tooltip:     self.c.Tr.OpenFileTooltip,
 		},
 		{
-			Key:             opts.GetKey(opts.Config.Universal.Return),
+			Keys:            opts.GetKeys(opts.Config.Universal.Return),
 			Handler:         self.escape,
 			Description:     self.c.Tr.ReturnToFilesPanel,
 			DisplayOnScreen: true,

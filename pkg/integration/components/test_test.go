@@ -34,6 +34,9 @@ func (self *fakeGuiDriver) Click(x, y int) {
 	self.clickedCoordinates = append(self.clickedCoordinates, coordinate{x: x, y: y})
 }
 
+func (self *fakeGuiDriver) FocusIn() {
+}
+
 func (self *fakeGuiDriver) Keys() config.KeybindingConfig {
 	return config.KeybindingConfig{}
 }
@@ -72,6 +75,10 @@ func (self *fakeGuiDriver) View(viewName string) *gocui.View {
 	return nil
 }
 
+func (self *fakeGuiDriver) TopViewInWindow(windowName string) *gocui.View {
+	return nil
+}
+
 func (self *fakeGuiDriver) SetCaption(string) {
 }
 
@@ -85,6 +92,8 @@ func (self *fakeGuiDriver) NextToast() *string {
 func (self *fakeGuiDriver) CheckAllToastsAcknowledged() {}
 
 func (self *fakeGuiDriver) Headless() bool { return false }
+
+func (self *fakeGuiDriver) PretendMergeOrRebaseStartedInLazygit() {}
 
 func TestManualFailure(t *testing.T) {
 	test := NewIntegrationTest(NewIntegrationTestArgs{

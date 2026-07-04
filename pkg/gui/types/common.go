@@ -59,6 +59,10 @@ type IGuiCommon interface {
 	Suspend() error
 	Resume() error
 
+	// Pause or resume the background routines. Calls nest, so every pause must be balanced
+	// by a resume.
+	PauseBackgroundRefreshes(pause bool)
+
 	Context() IContextMgr
 	ContextForKey(key ContextKey) Context
 
@@ -259,9 +263,10 @@ type MenuItem struct {
 	// Only applies when Label is used
 	OpensMenu bool
 
-	// If Key is defined it allows the user to press the key to invoke the menu
-	// item, as opposed to having to navigate to it
-	Key gocui.Key
+	// If Keys is non-empty, the user can press any of these keys to invoke the
+	// menu item, as opposed to having to navigate to it. Only the first key is
+	// shown in the menu; the alternates are matched silently.
+	Keys []gocui.Key
 
 	// A widget to show in front of the menu item. Supported widget types are
 	// checkboxes and radio buttons,
@@ -396,6 +401,8 @@ type IRepoStateAccessor interface {
 	GetSearchState() *SearchState
 	SetSplitMainPanel(bool)
 	GetSplitMainPanel() bool
+	GetMergeOrRebaseStartedInLazygit() bool
+	SetMergeOrRebaseStartedInLazygit(bool)
 }
 
 // startup stages so we don't need to load everything at once

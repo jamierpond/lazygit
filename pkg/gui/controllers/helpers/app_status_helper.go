@@ -66,12 +66,22 @@ func (self *AppStatusHelper) WithWaitingStatus(message string, f func(gocui.Task
 }
 
 func (self *AppStatusHelper) WithWaitingStatusImpl(message string, f func(gocui.Task) error, task gocui.Task) error {
+	// A waiting status means lazygit is driving a git operation itself (often
+	// one that internally runs a rebase and continues it). Pause the background
+	// routines for its duration so they don't refresh from an intermediate
+	// state and reveal, say, the half-finished history of a reword.
+	self.c.PauseBackgroundRefreshes(true)
+	defer self.c.PauseBackgroundRefreshes(false)
+
 	return self.statusMgr().WithWaitingStatus(message, self.renderAppStatus, func(waitingStatusHandle *status.WaitingStatusHandle) error {
 		return f(appStatusHelperTask{task, waitingStatusHandle})
 	})
 }
 
 func (self *AppStatusHelper) WithWaitingStatusSync(message string, f func() error) error {
+	self.c.PauseBackgroundRefreshes(true)
+	defer self.c.PauseBackgroundRefreshes(false)
+
 	return self.statusMgr().WithWaitingStatus(message, func() {}, func(*status.WaitingStatusHandle) error {
 		stop := make(chan struct{})
 		defer func() { close(stop) }()
@@ -126,6 +136,13 @@ func (self *AppStatusHelper) renderAppStatusSync(stop chan struct{}) {
 		ticker := time.NewTicker(time.Millisecond * time.Duration(self.c.UserConfig().Gui.Spinner.Rate))
 		defer ticker.Stop()
 
+		// Write the status into the view before the first layout below, so that
+		// layout (which sizes the bottom line based on the actual content of the
+		// AppStatus view) leaves room for it and it shows right away. The ticker
+		// only updates the spinner frame using ForceFlushViewsContentOnly, so this
+		// doesn't re-layout.
+		self.setAppStatusContent()
+
 		// Forcing a re-layout and redraw after we added the waiting status;
 		// this is needed in case the gui.showBottomLine config is set to false,
 		// to make sure the bottom line appears. It's also useful for redrawing
@@ -140,9 +157,7 @@ func (self *AppStatusHelper) renderAppStatusSync(stop chan struct{}) {
 		for {
 			select {
 			case <-ticker.C:
-				appStatus, color := self.statusMgr().GetStatusString(self.c.UserConfig())
-				self.c.Views().AppStatus.FgColor = color
-				self.c.SetViewContent(self.c.Views().AppStatus, appStatus)
+				self.setAppStatusContent()
 				// Redraw all views of the bottom line:
 				bottomLineViews := []*gocui.View{
 					self.c.Views().AppStatus, self.c.Views().Options, self.c.Views().Information,
@@ -150,8 +165,22 @@ func (self *AppStatusHelper) renderAppStatusSync(stop chan struct{}) {
 				}
 				_ = self.c.GocuiGui().ForceFlushViewsContentOnly(bottomLineViews)
 			case <-stop:
+				// Clear the status from the view and re-layout, otherwise the
+				// stale content would keep layout reserving room for it forever.
+				// The UI thread is free again at this point, so we go through
+				// OnUIThread like the async renderAppStatus does.
+				self.c.OnUIThread(func() error {
+					self.c.SetViewContent(self.c.Views().AppStatus, "")
+					return nil
+				})
 				break outer
 			}
 		}
 	}()
+}
+
+func (self *AppStatusHelper) setAppStatusContent() {
+	appStatus, color := self.statusMgr().GetStatusString(self.c.UserConfig())
+	self.c.Views().AppStatus.FgColor = color
+	self.c.SetViewContent(self.c.Views().AppStatus, appStatus)
 }

@@ -56,6 +56,27 @@ func (self *GuiDriver) Click(x, y int) {
 	self.waitTillIdle()
 }
 
+// FocusIn simulates the terminal window regaining focus, which is how lazygit
+// learns to reload changed config files. Tests use it to exercise the live
+// config-reload path.
+func (self *GuiDriver) FocusIn() {
+	self.gui.g.ReplayedEvents.FocusEvents <- gocui.NewTcellFocusEventWrapper(
+		tcell.NewEventFocus(true),
+		0,
+	)
+
+	self.waitTillIdle()
+}
+
+func (self *GuiDriver) PretendMergeOrRebaseStartedInLazygit() {
+	self.gui.onUIThread(func() error {
+		self.gui.State.SetMergeOrRebaseStartedInLazygit(true)
+		return nil
+	})
+
+	self.waitTillIdle()
+}
+
 // wait until lazygit is idle (i.e. all processing is done) before continuing
 func (self *GuiDriver) waitTillIdle() {
 	<-self.isIdleChan
@@ -139,6 +160,12 @@ func (self *GuiDriver) View(viewName string) *gocui.View {
 		panic(err)
 	}
 	return view
+}
+
+// TopViewInWindow returns the frontmost visible view in the given window, i.e.
+// the tab that is currently shown when a window holds several tabbed views.
+func (self *GuiDriver) TopViewInWindow(windowName string) *gocui.View {
+	return self.gui.helpers.Window.TopViewInWindow(windowName, false)
 }
 
 func (self *GuiDriver) SetCaption(caption string) {

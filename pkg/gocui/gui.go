@@ -103,6 +103,7 @@ type replayedEvents struct {
 	Keys        chan *TcellKeyEventWrapper
 	Resizes     chan *TcellResizeEventWrapper
 	MouseEvents chan *TcellMouseEventWrapper
+	FocusEvents chan *TcellFocusEventWrapper
 }
 
 type RecordingConfig struct {
@@ -178,9 +179,9 @@ type Gui struct {
 
 	OnSearchEscape func() error
 
-	SearchEscapeKey    Key
-	NextSearchMatchKey Key
-	PrevSearchMatchKey Key
+	SearchEscapeKeys    []Key
+	NextSearchMatchKeys []Key
+	PrevSearchMatchKeys []Key
 
 	ErrorHandler func(error) error
 
@@ -237,7 +238,12 @@ func NewGui(opts NewGuiOpts) (*Gui, error) {
 	g.stop = make(chan struct{})
 
 	g.gEvents = make(chan GocuiEvent, 20)
-	g.userEvents = make(chan userEvent, 20)
+	// Update does a non-blocking send and panics on a full channel rather than
+	// blocking (which would deadlock the UI goroutine against itself) or
+	// silently reordering. The buffer is sized well above the peak occupancy we
+	// see in practice, so the panic stays unreachable in normal use; if it ever
+	// fires, that's a real anomaly to investigate, not a cue to grow the buffer.
+	g.userEvents = make(chan userEvent, 256)
 	g.taskManager = newTaskManager()
 
 	if opts.PlayRecording {
@@ -245,6 +251,7 @@ func NewGui(opts NewGuiOpts) (*Gui, error) {
 			Keys:        make(chan *TcellKeyEventWrapper),
 			Resizes:     make(chan *TcellResizeEventWrapper),
 			MouseEvents: make(chan *TcellMouseEventWrapper),
+			FocusEvents: make(chan *TcellFocusEventWrapper),
 		}
 	}
 
@@ -256,9 +263,9 @@ func NewGui(opts NewGuiOpts) (*Gui, error) {
 	g.SupportOverlaps = opts.SupportOverlaps
 
 	// default keys for when searching strings in a view
-	g.SearchEscapeKey = NewKeyName(KeyEsc)
-	g.NextSearchMatchKey = NewKeyRune('n')
-	g.PrevSearchMatchKey = NewKeyRune('N')
+	g.SearchEscapeKeys = []Key{NewKeyName(KeyEsc)}
+	g.NextSearchMatchKeys = []Key{NewKeyRune('n')}
+	g.PrevSearchMatchKeys = []Key{NewKeyRune('N')}
 
 	g.playRecording = opts.PlayRecording
 
@@ -546,10 +553,9 @@ func (g *Gui) CurrentView() *View {
 // SetKeybinding creates a new keybinding. If viewname equals to ""
 // (empty string) then the keybinding will apply to all views. key must
 // be a rune or a Key.
-func (g *Gui) SetKeybinding(viewname string, key Key, handler func(*Gui, *View) error) error {
+func (g *Gui) SetKeybinding(viewname string, key Key, handler func(*Gui, *View) error) {
 	kb := newKeybinding(viewname, key, handler)
 	g.keybindings = append(g.keybindings, kb)
-	return nil
 }
 
 // DeleteKeybindings deletes all keybindings of view.
@@ -612,28 +618,23 @@ type userEvent struct {
 	contentOnly bool
 }
 
-// Update executes the passed function. This method can be called safely from a
-// goroutine in order to update the GUI. It is important to note that the
-// passed function won't be executed immediately, instead it will be added to
-// the user events queue. Given that Update spawns a goroutine, the order in
-// which the user events will be handled is not guaranteed.
+// Update enqueues f on the user-events channel for the UI loop to run on its
+// next iteration. Multiple Update calls from the same goroutine arrive in
+// source order via the channel's FIFO. The send is non-blocking — if the
+// channel is full we panic rather than block or silently reorder, since a
+// blocked send from the UI goroutine would deadlock against itself and
+// silently switching to inline execution would break the ordering guarantee
+// callers rely on. The buffer is sized generously enough that this should
+// never fire in practice; if it does, that's a signal to investigate, not
+// to grow the buffer reflexively.
 func (g *Gui) Update(f func(*Gui) error) {
 	task := g.NewTask()
 
-	go g.updateAsyncAux(f, task)
-}
-
-// UpdateAsync is a version of Update that does not spawn a go routine, it can
-// be a bit more efficient in cases where Update is called many times like when
-// tailing a file.  In general you should use Update()
-func (g *Gui) UpdateAsync(f func(*Gui) error) {
-	task := g.NewTask()
-
-	g.updateAsyncAux(f, task)
-}
-
-func (g *Gui) updateAsyncAux(f func(*Gui) error, task Task) {
-	g.userEvents <- userEvent{f: f, task: task}
+	select {
+	case g.userEvents <- userEvent{f: f, task: task}:
+	default:
+		panic("gocui: userEvents channel full; refusing to block or reorder")
+	}
 }
 
 // Like Update, but signals that the callback only modifies content.
@@ -1346,7 +1347,7 @@ func (g *Gui) onKey(ev *GocuiEvent) error {
 			}
 
 			visibleLineWidth := 0
-			for _, c := range v.lines[newY] {
+			for _, c := range v.lines[newY].cells {
 				visibleLineWidth += c.width
 			}
 			if visibleLineWidth < newX {
@@ -1526,11 +1527,11 @@ func (g *Gui) execKeybindings(v *View, ev *GocuiEvent) error {
 
 	// if we're searching, and we've hit n/N/Esc, we ignore the default keybinding
 	if v != nil && v.IsSearching() {
-		if ev.Key.Equals(g.NextSearchMatchKey) {
+		if lo.SomeBy(g.NextSearchMatchKeys, func(k Key) bool { return ev.Key.Equals(k) }) {
 			return v.gotoNextMatch()
-		} else if ev.Key.Equals(g.PrevSearchMatchKey) {
+		} else if lo.SomeBy(g.PrevSearchMatchKeys, func(k Key) bool { return ev.Key.Equals(k) }) {
 			return v.gotoPreviousMatch()
-		} else if ev.Key.Equals(g.SearchEscapeKey) {
+		} else if lo.SomeBy(g.SearchEscapeKeys, func(k Key) bool { return ev.Key.Equals(k) }) {
 			v.searcher.clearSearch()
 			if g.OnSearchEscape != nil {
 				if err := g.OnSearchEscape(); err != nil {
@@ -1670,7 +1671,7 @@ func (g *Gui) Snapshot() string {
 	return builder.String()
 }
 
-func (g *Gui) SetEditKeybindings(moveWordLeft, moveWordRight, backspaceWord, forwardDeleteWord Key) {
+func (g *Gui) SetEditKeybindings(moveWordLeft, moveWordRight, backspaceWord, forwardDeleteWord []Key) {
 	moveWordLeftKeybinding = moveWordLeft
 	moveWordRightKeybinding = moveWordRight
 	backspaceWordKeybinding = backspaceWord

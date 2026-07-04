@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/atotto/clipboard"
 	"github.com/jesseduffield/lazygit/pkg/config"
 	integrationTypes "github.com/jesseduffield/lazygit/pkg/integration/types"
 )
@@ -52,8 +51,16 @@ func (self *TestDriver) click(x, y int) {
 // Should only be used in specific cases where you're doing something weird!
 // E.g. invoking a global keybinding from within a popup.
 // You probably shouldn't use this function, and should instead go through a view like t.Views().Commit().Focus().Press(...)
-func (self *TestDriver) GlobalPress(keyStr string) {
-	self.press(keyStr)
+func (self *TestDriver) GlobalPress(key config.Keybinding) {
+	self.press(key[0])
+}
+
+// FocusIn simulates the terminal window regaining focus, which causes lazygit
+// to reload any config files that changed while it was in the background.
+func (self *TestDriver) FocusIn() {
+	self.SetCaption("Focusing window")
+	self.gui.FocusIn()
+	self.Wait(self.inputDelay)
 }
 
 func (self *TestDriver) typeContent(content string) {
@@ -115,17 +122,6 @@ func (self *TestDriver) ExpectToast(matcher *TextMatcher) *TestDriver {
 	}
 
 	return self
-}
-
-func (self *TestDriver) ExpectClipboard(matcher *TextMatcher) {
-	self.assertWithRetries(func() (bool, string) {
-		text, err := clipboard.ReadAll()
-		if err != nil {
-			return false, "Error occurred when reading from clipboard: " + err.Error()
-		}
-		ok, _ := matcher.test(text)
-		return ok, fmt.Sprintf("Expected clipboard to match %s, but got %s", matcher.name(), text)
-	})
 }
 
 func (self *TestDriver) ExpectSearch() *SearchDriver {

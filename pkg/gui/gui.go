@@ -85,7 +85,7 @@ type Gui struct {
 	// holds a mapping of view names to ptmx's. This is for rendering command outputs
 	// from within a pty. The point of keeping track of them is so that if we re-size
 	// the window, we can tell the pty it needs to resize accordingly.
-	viewPtmxMap map[string]*os.File
+	viewPtmxMap map[string]oscommands.Pty
 	stopChan    chan struct{}
 
 	// when lazygit is opened outside a git directory we want to open to the most
@@ -255,6 +255,14 @@ type GuiRepoState struct {
 	CurrentPopupOpts *types.CreatePopupPanelOpts
 
 	LastBackgroundFetchTime time.Time
+
+	// Whether the rebase/merge/cherry-pick/revert that's currently in progress
+	// was started from within lazygit (as opposed to being started externally,
+	// e.g. in another terminal or by a coding agent). We only auto-prompt to
+	// continue such an operation once its conflicts are resolved if we started
+	// it ourselves; for an externally started one, popping up unbidden would be
+	// confusing. Reset whenever we observe that no operation is in progress.
+	mergeOrRebaseStartedInLazygit bool
 }
 
 var _ types.IRepoStateAccessor = new(GuiRepoState)
@@ -281,6 +289,14 @@ func (self *GuiRepoState) GetCurrentPopupOpts() *types.CreatePopupPanelOpts {
 
 func (self *GuiRepoState) SetCurrentPopupOpts(value *types.CreatePopupPanelOpts) {
 	self.CurrentPopupOpts = value
+}
+
+func (self *GuiRepoState) GetMergeOrRebaseStartedInLazygit() bool {
+	return self.mergeOrRebaseStartedInLazygit
+}
+
+func (self *GuiRepoState) SetMergeOrRebaseStartedInLazygit(value bool) {
+	self.mergeOrRebaseStartedInLazygit = value
 }
 
 func (self *GuiRepoState) GetScreenMode() types.ScreenMode {
@@ -357,6 +373,7 @@ func (gui *Gui) onNewRepo(startArgs appTypes.StartArgs, contextKey types.Context
 			if didChange && reloadErr == nil {
 				gui.c.Log.Info("User config changed - reloading")
 				reloadErr = gui.onUserConfigLoaded()
+				gui.reloadSidePanels()
 				if err := gui.resetKeybindings(); err != nil {
 					return err
 				}
@@ -472,15 +489,15 @@ func (gui *Gui) onUserConfigLoaded() error {
 	gui.setColorScheme()
 	gui.configureViewProperties()
 
-	gui.g.SearchEscapeKey = config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.Return)
-	gui.g.NextSearchMatchKey = config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.NextMatch)
-	gui.g.PrevSearchMatchKey = config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.PrevMatch)
+	gui.g.SearchEscapeKeys = config.GetValidatedKeyBindingKeys(userConfig.Keybinding.Universal.Return)
+	gui.g.NextSearchMatchKeys = config.GetValidatedKeyBindingKeys(userConfig.Keybinding.Universal.NextMatch)
+	gui.g.PrevSearchMatchKeys = config.GetValidatedKeyBindingKeys(userConfig.Keybinding.Universal.PrevMatch)
 
 	gui.g.SetEditKeybindings(
-		config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.MoveWordLeft),
-		config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.MoveWordRight),
-		config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.BackspaceWord),
-		config.GetValidatedKeyBindingKey(userConfig.Keybinding.Universal.ForwardDeleteWord),
+		config.GetValidatedKeyBindingKeys(userConfig.Keybinding.Universal.MoveWordLeft),
+		config.GetValidatedKeyBindingKeys(userConfig.Keybinding.Universal.MoveWordRight),
+		config.GetValidatedKeyBindingKeys(userConfig.Keybinding.Universal.BackspaceWord),
+		config.GetValidatedKeyBindingKeys(userConfig.Keybinding.Universal.ForwardDeleteWord),
 	)
 
 	gui.g.ShowListFooter = userConfig.Gui.ShowListFooter
@@ -515,8 +532,10 @@ func (gui *Gui) checkForChangedConfigsThatDontAutoReload(oldConfig *config.UserC
 	configsThatDontAutoReload := []string{
 		"Git.AutoFetch",
 		"Git.AutoRefresh",
+		"Git.AutoDetectExternalChanges",
 		"Refresher.RefreshInterval",
 		"Refresher.FetchInterval",
+		"Refresher.ExternalChangeCheckInterval",
 		"Update.Method",
 		"Update.Days",
 	}
@@ -579,8 +598,9 @@ func (gui *Gui) resetState(startArgs appTypes.StartArgs) types.Context {
 		gui.State = state
 		gui.State.ViewsSetup = false
 
-		contextTree := gui.State.Contexts
-		gui.State.WindowViewNameMap = initialWindowViewNameMap(contextTree)
+		// The repo we're switching to may have a per-repo config with a different
+		// side panel layout, so re-apply it to this repo's contexts.
+		gui.applySidePanelConfig()
 
 		// setting this to nil so we don't get stuck based on a popup that was
 		// previously opened
@@ -620,13 +640,14 @@ func (gui *Gui) resetState(startArgs appTypes.StartArgs) types.Context {
 		},
 		ScreenMode: initialScreenMode,
 		// TODO: only use contexts from context manager
-		ContextMgr:        NewContextMgr(gui, contextTree),
-		Contexts:          contextTree,
-		WindowViewNameMap: initialWindowViewNameMap(contextTree),
-		SearchState:       types.NewSearchState(),
+		ContextMgr:  NewContextMgr(gui, contextTree),
+		Contexts:    contextTree,
+		SearchState: types.NewSearchState(),
 	}
 
 	gui.RepoStateMap[Repo(worktreePath)] = gui.State
+
+	gui.applySidePanelConfig()
 
 	return initialContext(contextTree, startArgs)
 }
@@ -658,11 +679,17 @@ func (gui *Gui) getViewBufferManagerForView(view *gocui.View) *tasks.ViewBufferM
 	return manager
 }
 
-func initialWindowViewNameMap(contextTree *context.ContextTree) *utils.ThreadSafeMap[string, string] {
+func (gui *Gui) initialWindowViewNameMap(contextTree *context.ContextTree) *utils.ThreadSafeMap[string, string] {
 	result := utils.NewThreadSafeMap[string, string]()
 
 	for _, context := range contextTree.Flatten() {
 		result.Set(context.GetWindowName(), context.GetViewName())
+	}
+
+	// A side panel's window shows its first configured tab by default, which is
+	// not necessarily the context that won the loop above.
+	for _, panel := range gui.c.UserConfig().Gui.SidePanels {
+		result.Set(panel[0], sidePanelViewNames[panel[0]])
 	}
 
 	return result
@@ -734,7 +761,7 @@ func NewGui(
 		Updater:              updater,
 		statusManager:        status.NewStatusManager(),
 		viewBufferManagerMap: map[string]*tasks.ViewBufferManager{},
-		viewPtmxMap:          map[string]*os.File{},
+		viewPtmxMap:          map[string]oscommands.Pty{},
 		showRecentRepos:      showRecentRepos,
 		RepoPathStack:        &utils.StringStack{},
 		RepoStateMap:         map[Repo]*GuiRepoState{},
@@ -834,45 +861,19 @@ func (gui *Gui) initGocui(headless bool, test integrationTypes.IntegrationTest) 
 }
 
 func (gui *Gui) viewTabMap() map[string][]context.TabView {
-	result := map[string][]context.TabView{
-		"branches": {
-			{
-				Tab:      gui.c.Tr.LocalBranchesTitle,
-				ViewName: "localBranches",
-			},
-			{
-				Tab:      gui.c.Tr.RemotesTitle,
-				ViewName: "remotes",
-			},
-			{
-				Tab:      gui.c.Tr.TagsTitle,
-				ViewName: "tags",
-			},
-		},
-		"commits": {
-			{
-				Tab:      gui.c.Tr.CommitsTitle,
-				ViewName: "commits",
-			},
-			{
-				Tab:      gui.c.Tr.ReflogCommitsTitle,
-				ViewName: "reflogCommits",
-			},
-		},
-		"files": {
-			{
-				Tab:      gui.c.Tr.FilesTitle,
-				ViewName: "files",
-			},
-			context.TabView{
-				Tab:      gui.c.Tr.WorktreesTitle,
-				ViewName: "worktrees",
-			},
-			{
-				Tab:      gui.c.Tr.SubmodulesTitle,
-				ViewName: "submodules",
-			},
-		},
+	titles := gui.sidePanelTabTitles()
+	result := map[string][]context.TabView{}
+	for _, panel := range gui.c.UserConfig().Gui.SidePanels {
+		if len(panel) < 2 {
+			// A single-tab panel shows its view's own title, not a tab strip.
+			continue
+		}
+		result[panel[0]] = lo.Map(panel, func(name string, _ int) context.TabView {
+			return context.TabView{
+				Tab:      titles[name],
+				ViewName: sidePanelViewNames[name],
+			}
+		})
 	}
 
 	return result
@@ -1089,7 +1090,7 @@ func (gui *Gui) showIntroPopupMessage() {
 		introMessage := utils.ResolvePlaceholderString(
 			gui.c.Tr.IntroPopupMessage,
 			map[string]string{
-				"confirmationKey": gui.c.UserConfig().Keybinding.Universal.Confirm,
+				"confirmationKey": gui.c.UserConfig().Keybinding.Universal.Confirm.String(),
 			},
 		)
 
